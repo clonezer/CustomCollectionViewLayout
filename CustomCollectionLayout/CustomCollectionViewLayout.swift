@@ -9,7 +9,7 @@
 import UIKit
 
 class CustomCollectionViewLayout: UICollectionViewLayout {
-
+    
     let numberOfColumns = 8
     var itemAttributes : NSMutableArray!
     var itemsSize : NSMutableArray!
@@ -20,15 +20,18 @@ class CustomCollectionViewLayout: UICollectionViewLayout {
             return
         }
         
+        //กรณีที่สร้างไปแล้ว แค่เข้ามา Freeze Header Row/ Column ก็จบ
         if (self.itemAttributes != nil && self.itemAttributes.count > 0) {
+            
             for section in 0..<self.collectionView!.numberOfSections() {
-                var numberOfItems : Int = self.collectionView!.numberOfItemsInSection(section)
+                let numberOfItems : Int = self.collectionView!.numberOfItemsInSection(section)
                 for index in 0..<numberOfItems {
+                    
                     if section != 0 && index != 0 {
                         continue
                     }
                     
-                    var attributes : UICollectionViewLayoutAttributes = self.layoutAttributesForItemAtIndexPath(NSIndexPath(forItem: index, inSection: section))
+                    let attributes : UICollectionViewLayoutAttributes = self.layoutAttributesForItemAtIndexPath(NSIndexPath(forItem: index, inSection: section))!
                     if section == 0 {
                         var frame = attributes.frame
                         frame.origin.y = self.collectionView!.contentOffset.y
@@ -45,25 +48,33 @@ class CustomCollectionViewLayout: UICollectionViewLayout {
             return
         }
         
+        //กรณีที่ยังไม่มี Attribute หรือเข้าครั้งแรก
         if (self.itemsSize == nil || self.itemsSize.count != numberOfColumns) {
+            //เข้ามากำหนด Cell width/height ของ Item ตามจำนวน column ซึ่งกรณีนี้มี 8
             self.calculateItemsSize()
         }
         
+        //initial ค่าก่อนการสร้าง attribute
         var column = 0
         var xOffset : CGFloat = 0
         var yOffset : CGFloat = 0
         var contentWidth : CGFloat = 0
         var contentHeight : CGFloat = 0
         
+        //เริ่ม loop สร้าง row จาก numberOfSections ให้คิดว่า section คือ row
         for section in 0..<self.collectionView!.numberOfSections() {
-            var sectionAttributes = NSMutableArray()
-            
+            let sectionAttributes = NSMutableArray()
+            //เริ่ม loop สร้าง column โดยให้ index คือ column
             for index in 0..<numberOfColumns {
-                var itemSize = self.itemsSize[index].CGSizeValue()
-                var indexPath = NSIndexPath(forItem: index, inSection: section)
-                var attributes = UICollectionViewLayoutAttributes(forCellWithIndexPath: indexPath)
-                attributes.frame = CGRectIntegral(CGRectMake(xOffset, yOffset, itemSize.width, itemSize.height))
                 
+                let itemSize = self.itemsSize[index].CGSizeValue()
+                let indexPath = NSIndexPath(forItem: index, inSection: section) //เห็นไหมว่ามันเป็น row กับ column
+                
+                //สร้าง attribute ขึ้นมาตาม indexPath โดยจับยัด frame และ z-index เอาไว้ด้วยเผื่อกรณี freeze
+                let attributes = UICollectionViewLayoutAttributes(forCellWithIndexPath: indexPath)
+                attributes.frame = CGRectIntegral(CGRectMake(xOffset, yOffset, itemSize.width, itemSize.height))
+
+                //column header จะอยู่สูงกว่า row header
                 if section == 0 && index == 0 {
                     attributes.zIndex = 1024;
                 } else  if section == 0 || index == 0 {
@@ -72,20 +83,22 @@ class CustomCollectionViewLayout: UICollectionViewLayout {
                 
                 if section == 0 {
                     var frame = attributes.frame
-                    frame.origin.y = self.collectionView!.contentOffset.y
+                    frame.origin.y = self.collectionView!.contentOffset.y //column header จะขยับตาม content offset แกน y ทำให้มองดูเหมือนติดอยู่ข้างบนตลอดเวลา
                     attributes.frame = frame
                 }
                 if index == 0 {
                     var frame = attributes.frame
-                    frame.origin.x = self.collectionView!.contentOffset.x
+                    frame.origin.x = self.collectionView!.contentOffset.x //row header จะขยับตาม content offset แกน x ทำให้มองดูเหมือนติดอยู่ข้างซ้ายตลอดเวลา
                     attributes.frame = frame
                 }
                 
+                //เก็บลง array ของ column
                 sectionAttributes.addObject(attributes)
                 
-                xOffset += itemSize.width
+                xOffset += itemSize.width //ขยับ xOffset ออกไปเพื่อให้เป็น column ต่อไป
                 column++
                 
+                //ถ้าเป็น column สุดท้าย ให้ทำการ reset xOffset แล้วก็ไปเพิ่ม yOffset แทนเพื่อเพิ่ม row ถัดไป
                 if column == numberOfColumns {
                     if xOffset > contentWidth {
                         contentWidth = xOffset
@@ -96,13 +109,17 @@ class CustomCollectionViewLayout: UICollectionViewLayout {
                     yOffset += itemSize.height
                 }
             }
+            
             if (self.itemAttributes == nil) {
                 self.itemAttributes = NSMutableArray(capacity: self.collectionView!.numberOfSections())
             }
+            
+            //เก็บลง array ของ row
             self.itemAttributes .addObject(sectionAttributes)
         }
         
-        var attributes : UICollectionViewLayoutAttributes = self.itemAttributes.lastObject?.lastObject as! UICollectionViewLayoutAttributes
+        //ปรับขนาด content size ของ collectionView ตาม attribute ตัวสุดท้าย
+        let attributes : UICollectionViewLayoutAttributes = self.itemAttributes.lastObject?.lastObject as! UICollectionViewLayoutAttributes
         contentHeight = attributes.frame.origin.y + attributes.frame.size.height
         self.contentSize = CGSizeMake(contentWidth, contentHeight)
     }
@@ -111,12 +128,13 @@ class CustomCollectionViewLayout: UICollectionViewLayout {
         return self.contentSize
     }
     
-    override func layoutAttributesForItemAtIndexPath(indexPath: NSIndexPath) -> UICollectionViewLayoutAttributes! {
-        return self.itemAttributes[indexPath.section][indexPath.row] as! UICollectionViewLayoutAttributes
+    override func layoutAttributesForItemAtIndexPath(indexPath: NSIndexPath) -> UICollectionViewLayoutAttributes? {
+        return self.itemAttributes[indexPath.section][indexPath.row] as? UICollectionViewLayoutAttributes
     }
     
     override func layoutAttributesForElementsInRect(rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
         var attributes = [UICollectionViewLayoutAttributes]()
+        
         if self.itemAttributes != nil {
             for section in self.itemAttributes {
                 
